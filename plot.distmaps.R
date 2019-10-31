@@ -44,7 +44,7 @@ plot.distmaps <- function(distribution.table, new.directory=NULL, base.map=NULL,
   
   for (p in 1:length(unique(distribution.table$Name_in_Tree))) {
     current.taxon <- all.taxa[[p]]
-    cat("iteration", p, "of", length(unique(distribution.table$Name_in_Tree)), "\n") #keep track of what tree/loop# we're on
+    cat(paste("plotting", unique(distribution.table$Name_in_Tree)[[p]], ",", p, "of", length(unique(distribution.table$Name_in_Tree)), "\n")) #keep track of what tree/loop# we're on
     
     current.data <- subset(distribution.table, distribution.table$Name_in_Tree == current.taxon)
     if (nrow(current.data) > 1000) {
