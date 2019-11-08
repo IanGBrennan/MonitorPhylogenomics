@@ -1,6 +1,7 @@
 library(rase)
 library(rgeos)
 library(sp)
+library(raster)
 
 
 # here's a function for extracting the node distributions
