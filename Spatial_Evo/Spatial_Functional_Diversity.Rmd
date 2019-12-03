@@ -1,0 +1,1654 @@
+---
+title: "Spatial and Functional Diversity"
+author: "Ian G. Brennan"
+date: "12/11/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load a whole bunch of packages we (mostly) need
+```{r, message = F, warning = F}
+library(phytools); library(ALA4R); 
+library(raster); library(rgeos); 
+library(sp); library(vegan)
+library(FD); library(raster); 
+library(rgdal); library(ggmap); 
+library(broom); library(dplyr)
+library(wesanderson); library(fields)
+library(metricTester); library(picante)
+library(fields); library(RColorBrewer)
+library(FD)
+```
+
+
+We're going to turn our focus over to the Australian radiation of monitor lizards now, so we can load some existing files.  
+```{r}
+#tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Trait_Evo/Goanna_Walkthrough.RDS")
+tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Spatial_Walkthrough.RDS")
+names(tutorial)
+```
+
+\  
+
+Create a tibble from the distribution data, turn it into Site x Species tibble
+```{r}
+ygridded <- tutorial$distribution.data %>%
+  
+  ## bin into 0.5-degree bins
+  dplyr::mutate(longitude=round(Longitude*2)/2, latitude=round(Latitude*2)/2) %>%
+  
+  #  ## average environmental vars within each bin
+  group_by(longitude,latitude) %>%
+  #  mutate(precipitationAnnual=mean(precipitationAnnual, na.rm=TRUE),
+  #         temperatureAnnualMaxMean=mean(temperatureAnnualMaxMean, na.rm=TRUE)) %>%
+  
+  ## subset to vars of interest
+  dplyr::select(longitude, latitude, Name_in_Tree) %>%
+  
+  ## take one row per cell per species (presence)
+  distinct() %>%
+  
+  ## calculate species richness
+  dplyr::mutate(richness=n()) %>%
+  
+  ## convert to wide format (sites by species)
+  dplyr::mutate(present=1) %>%
+  do(tidyr::spread(data=., key=Name_in_Tree, value=present, fill=0)) %>%
+  ungroup()
+```
+
+<!--
+Or make a site x species matrix incorporating abundances
+THIS DIDN'T WORK THE WAY I THOUGHT IT WAS GOING TO SO I NEED TO COME BACK TO IT
+IT DOESN'T DO THE RICHNESS PER TAXON PROPERLY, IT JUST MAKES IT PER CELL!
+```{r, eval=F}
+ssa <- tutorial$distribution.data %>%
+  
+  ## bin into 0.5-degree bins
+  dplyr::mutate(longitude=round(Longitude*2)/2, latitude=round(Latitude*2)/2) %>%
+  
+  #  ## average environmental vars within each bin
+  group_by(longitude,latitude) %>%
+  #  mutate(precipitationAnnual=mean(precipitationAnnual, na.rm=TRUE),
+  #         temperatureAnnualMaxMean=mean(temperatureAnnualMaxMean, na.rm=TRUE)) %>%
+  
+  ## subset to vars of interest
+  dplyr::select(longitude, latitude, Name_in_Tree) %>%
+  
+  ## take one row per cell per species (presence)
+  distinct() %>%
+  
+  ## calculate species richness
+  dplyr::mutate(richness=n()) %>%
+  
+  ## convert to wide format (sites by species), make the value 'richness'
+  do(tidyr::spread(data=., key=Name_in_Tree, value=richness, fill=0)) %>%
+  ungroup()
+```
+--> 
+
+\  
+
+Have a quick look at the Site x Species tibble, then translate it to a data frame we can manipulate normally.
+```{r}
+gridded.dist <- as.data.frame(ygridded)
+gridded.dist[1:5, 1:7]
+```
+
+Lots of sites don't have any records, and are listed as NAs. This won't jibe with our code, so switch NA to 0. 
+```{r}
+gridded.dist[is.na(gridded.dist)] <- 0 # make NAs 0
+gridded.dist <- filter(gridded.dist, !richness==1) # remove sites with just one taxon
+gridded.dist <- filter(gridded.dist, latitude <= -11); 
+gridded.dist <- filter(gridded.dist, longitude >= 113.5)
+gdist <- gridded.dist[ , 4:ncol(gridded.dist)]
+```
+<!--
+```{r, eval=F}
+abundance.dist[is.na(abundance.dist)] <- 0 # make NAs 0
+abundance.dist <- filter(abundance.dist, latitude <= -11); 
+abundance.dist <- filter(abundance.dist, longitude >= 113.5)
+abdist <- abundance.dist[ , 3:ncol(abundance.dist)]
+```
+-->
+Make the order of the trait dataframe match the order of the Site x Species DF
+```{r}
+goanna.trait <- tutorial$size.data[match(colnames(gdist), 
+                                   tutorial$size.data$Name_in_Tree),]
+goanna.frame <- data.frame(SVL = goanna.trait$Body_Length); 
+rownames(goanna.frame) <- goanna.trait$Name_in_Tree
+```
+
+
+Run the Functional Diversity function and extract two estimates of fuctional diversity: the Rao's Quadratic value, and FDis
+```{r, message = F, warning = F}
+best <- dbFD(log(goanna.frame), gdist)
+RQ.scores <- best$RaoQ
+FDis.scores <- best$FDis
+res.table <- cbind.data.frame(latitude=gridded.dist$latitude, 
+                              longitude=gridded.dist$longitude, 
+                              RaoQ=best$RaoQ, FDis=best$FDis)
+```
+<!--
+```{r, eval=F}
+best <- dbFD(log(goanna.frame), abdist)
+FDis.scores <- best$FDis
+ab.res.table <- cbind.data.frame(latitude=abundance.dist$latitude, 
+                              longitude=abundance.dist$longitude, 
+                              FDis=best$FDis)
+```
+--->
+Read in your shapefile
+```{r, warning = F, message = F}
+oz <- shapefile("~/Documents/GitHub/MonitorPhylogenomics/Map_Shapefiles/Australia.shp")
+plot(oz)
+```
+
+Set up a raster "template" for a 0.5 degree grid
+```{r}
+ext <- extent(113.2244, 153.6242, -43.64806, -10.70667)
+gridsize <- 0.5
+r <- raster(ext, res=gridsize)
+```
+
+Rasterize the shapefile
+```{r}
+rr <- rasterize(oz, r)
+```
+
+Plot raster
+```{r}
+plot(rr)
+```
+
+```{r}
+rr.cells <- xyFromCell(rr, 1:length(rr)); 
+rr.cells <- as.data.frame(rr.cells)
+rr.cells$x <- round(rr.cells$x*2)/2; 
+rr.cells$y <- round(rr.cells$y*2)/2
+colnames(rr.cells) <- c("longitude", "latitude")
+head(rr.cells)
+```
+
+Fill raster cells by FD values (Rao's Q, FDis), and visualize it.
+```{r}
+combo.Q <- left_join(rr.cells, 
+                     res.table, 
+                     by=c("longitude", "latitude"))
+FDras <- rr
+values(FDras) <- combo.Q$RaoQ
+plot(FDras)
+
+FDisras <- rr
+values(FDisras) <- combo.Q$FDis
+plot(FDisras)
+```
+
+Fill raster cells by richness and visualize it.
+```{r}
+combo.R <- left_join(rr.cells, 
+                     gridded.dist[,1:3], 
+                     by=c("longitude", "latitude"))
+RICHras <- rr
+values(RICHras) <- combo.R$richness
+plot(RICHras)
+```
+
+
+We can do this a bit prettier, start by establishing a map
+```{r}
+graymap <- get_googlemap(center = "Australia", zoom = 4, style = 'https://maps.googleapis.com/maps/api/staticmap?&center=-33.9,151.14999999999998&zoom=12&format=png&maptype=roadmap&style=element:geometry%7Ccolor:0xf5f5f5&style=element:labels%7Cvisibility:off&style=element:labels.icon%7Cvisibility:off&style=element:labels.text.fill%7Ccolor:0x616161&style=element:labels.text.stroke%7Ccolor:0xf5f5f5&style=feature:administrative%7Celement:geometry%7Cvisibility:off&style=feature:administrative.land_parcel%7Cvisibility:off&style=feature:administrative.land_parcel%7Celement:labels.text.fill%7Ccolor:0xbdbdbd&style=feature:administrative.neighborhood%7Cvisibility:off&style=feature:poi%7Cvisibility:off&style=feature:poi%7Celement:geometry%7Ccolor:0xeeeeee&style=feature:poi%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:poi.park%7Celement:geometry%7Ccolor:0xe5e5e5&style=feature:poi.park%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&style=feature:road%7Cvisibility:off&style=feature:road%7Celement:geometry%7Ccolor:0xffffff&style=feature:road%7Celement:labels.icon%7Cvisibility:off&style=feature:road.arterial%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:road.highway%7Celement:geometry%7Ccolor:0xdadada&style=feature:road.highway%7Celement:labels.text.fill%7Ccolor:0x616161&style=feature:road.local%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&style=feature:transit%7Cvisibility:off&style=feature:transit.line%7Celement:geometry%7Ccolor:0xe5e5e5&style=feature:transit.station%7Celement:geometry%7Ccolor:0xeeeeee&style=feature:water%7Celement:geometry%7Ccolor:0xc9c9c9&style=feature:water%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&size=480x360')
+ggmap(graymap)
+```
+
+Create richness polygons
+```{r, message = F, warning = F}
+RICHpoly <- rasterToPolygons(RICHras); 
+max.colors <- length(unique(RICHpoly$layer)); 
+filled.RICH <- rep(RICHpoly$layer, each=5) 
+# 'each' is important, otherwise the polygon values get screwed up
+```
+
+Set the color palette length and the breakpoints 
+```{r}
+RICHras@data@values[is.na(RICHras@data@values)] <- 0
+pal.length <- abs(min(RICHras@data@values) - max(RICHras@data@values)) * 10
+myBreaks <- c(seq(min(RICHras@data@values), 0, length.out=ceiling(pal.length/2) + 1), 
+              seq(max(RICHras@data@values)/pal.length, max(RICHras@data@values), 
+                  length.out=floor(pal.length/2)))
+```
+
+```{r, message = F, warning = F}
+ggmap(graymap) + 
+  geom_polygon(data = RICHpoly,
+               aes(x = long, y = lat, 
+                   group = group, 
+                   fill = filled.RICH), 
+               size = 0, alpha = 1)  +
+  scale_fill_gradientn("Richness",
+                       colors = rev(colorRampPalette(
+                         brewer.pal(9, "RdYlBu"))(max.colors))) +
+  theme_classic()
+```
+
+Do the same for functional diversity (choose either FDras or FDisras)
+```{r}
+FDpoly <- rasterToPolygons(FDras);
+#FDpoly <- rasterToPolygons(FDisras)
+max.colors <- length(unique(FDpoly$layer)); 
+filled.FD <- rep(FDpoly$layer, each=5) 
+# 'each' is important, otherwise the polygon values get screwed up
+```
+
+Set the color palette length and the breakpoints 
+```{r}
+FDras@data@values[is.na(FDras@data@values)] <- 0
+pal.length <- abs(min(FDras@data@values) - max(FDras@data@values)) * 10
+myBreaks <- c(seq(min(FDras@data@values), 0, length.out=ceiling(pal.length/2) + 1), 
+              seq(max(FDras@data@values)/pal.length, max(FDras@data@values), 
+                  length.out=floor(pal.length/2)))
+#FDras@data@values[which(FDras@data@values == 0)] <- "NA"
+```
+
+```{r, message=F, warning=F}
+ggmap(graymap) + 
+  geom_polygon(data = FDpoly, 
+               aes(x = long, 
+                   y = lat, 
+                   group = group, 
+                   fill = filled.FD), 
+               size = 0, alpha = 1)  +
+  scale_fill_gradientn("FD", 
+                       values=scales::rescale(c(min(res.table$RaoQ),
+                                                mean(res.table$RaoQ)/2,
+                                                mean(res.table$RaoQ),
+                                                mean(res.table$RaoQ)*2,
+                                                max(res.table$RaoQ))),
+                       colors = rev(colorRampPalette(
+                         brewer.pal(9, "RdYlBu"))(max.colors))) +
+
+  theme_classic()
+```
+
+
+We've plotted richness and functional diversity, but we'd like to know if either is significantly different than scores from random communities.  
+We've already got a community matrix ('gridded.dist'), so just copy that.
+```{r}
+cm <- gridded.dist
+```
+
+Create an empty raster or two
+```{r}
+richness.raster <- rr; richness.raster@data@values[] <- 0
+fd.raster <- rr; fd.raster@data@values[] <- 0
+```
+
+Add the FD and Richness scores to your community matrix
+```{r}
+pre.rr <- left_join(rr.cells, cm, by=c("latitude", "longitude")); pre.rr[is.na(pre.rr)] <- 0
+pre.fd <- left_join(rr.cells, res.table, by=c("latitude", "longitude"))
+    pre.fd <- left_join(pre.fd, cm, by=c("latitude", "longitude")); pre.fd[is.na(pre.fd)] <- 0
+```
+
+Pass along the values from the matrices to your rasters
+```{r}
+richness.raster@data@values <- pre.rr$richness
+fd.raster@data@values <- pre.fd$RaoQ
+#fd.raster@data@values <- pre.fd$FDis
+```
+
+Quickly plot them again to make sure they make sense and nothing funny happened
+```{r}
+plot(richness.raster)
+plot(fd.raster)
+```
+
+Identify which cells have richness values > 1 (more than one taxon occupying it)  
+Or identify which cells have functional diversity values > 0 (so we can compare)
+```{r}
+cells.rich <- which(richness.raster@data@values > 1)
+cells.fd <- which(fd.raster@data@values > 0)
+```
+
+
+Make your blank site x species matrices by choosing cells with richness (>1) and FD (>0)
+```{r}
+input.rr <- pre.rr[,4:ncol(pre.rr)]; 
+input.rr <- input.rr[which(rowSums(input.rr) > 1),]
+input.fd <- pre.fd[which(pre.fd$RaoQ > 0), 6:ncol(pre.fd)]
+#input.fd <- pre.fd[which(pre.fd$FDis > 0), 6:ncol(pre.fd)]
+```
+
+We can check this quickly by showing how many sites there were (including those with no observations), and how many we now have (including only those with observations)
+```{r, echo=F}
+paste(nrow(pre.rr), "total sites")
+paste(nrow(input.rr), "sites have >1 species present")
+```
+
+Get the x (longitude) y (latitude) coordinates of those cells
+```{r}
+coords.rich <- xyFromCell(richness.raster, cells.rich)
+coords.fd <- xyFromCell(fd.raster, cells.fd)
+```
+
+Now create the greater circle distance (in meters) for each raster. This is an important input step for our 
+```{r}
+# for richness
+gc.dist.rich <- rdist.earth(coords.rich); 
+rownames(gc.dist.rich) <- cells.rich; 
+colnames(gc.dist.rich) <- cells.rich; 
+diag(gc.dist.rich) <- 0
+
+# for functional diversity
+gc.dist.fd <- rdist.earth(coords.fd); 
+rownames(gc.dist.fd) <- cells.fd; 
+colnames(gc.dist.fd) <- cells.fd; 
+diag(gc.dist.fd) <- 0
+```
+
+We'll need to source the dispersal null metric function
+```{r}
+source("~/Documents/GitHub/MonitorPhylogenomics/DispersalNullModel.R")
+```
+
+And create an additional function to run this null model repeatedly
+```{r}
+library(parallel)
+nullFD <- function(n.model, n.iter, 
+                   method=c("randomizeMatrix", "DNM"), 
+                   cores, trait.data, measure=c("RaoQ", "FDis", "Richness"), 
+                   great.circle){
+  
+  beginning <- Sys.time()
+  Rao.table <- NULL
+  
+  if(method=="randomizeMatrix"){
+    swap <- mclapply(1:n.iter, function(x) {
+      randomizeMatrix(input.fd, 
+                      null.model=n.model, 
+                      iterations=10)}, 
+      mc.cores=cores)
+    swap.res <- mclapply(1:length(swap), function(x) {
+      dbFD(trait.frame, swap[[x]])}, mc.cores=8)
+    
+    for(j in 1:length(swap.res)){
+      Rao.table <- cbind(Rao.table, swap.res[[j]]$RaoQ)
+    }
+  }
+  else if(method=="DNM"){
+    swap <- mclapply(1:n.iter, function(x) {
+      DNM(input.fd, tree=NA, 
+          great.circle, abundance.matters=F,
+          abundance.assigned="directly")}, mc.cores=cores)
+    swap <- Filter(function(x) length(x)>1, swap)
+    # Get FD
+    if (measure=="RaoQ"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        dbFD(trait.data, swap[[x]])}, mc.cores=8)
+      for(j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]]$RaoQ)
+      }
+    }
+    else if (measure=="FDis"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        dbFD(trait.data, swap[[x]])}, mc.cores=8)
+      for(j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]]$FDis)
+      }
+    }
+    # or Get RICHNESS
+    else if (measure=="Richness"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        rowSums(swap[[x]])}, mc.cores=8)
+      for (j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]])
+      }
+    }
+    
+    print(paste("you attempted", n.iter, 
+                "iterations, and you got", 
+                length(swap), "simulations"))
+
+  }
+  
+  end <- Sys.time()
+  duration <- format(end-beginning)
+  print(paste("Computation time to fit", n.iter, 
+              method, "null models:", duration))
+  
+  Rao.table <- as.data.frame(Rao.table); 
+  Raw.table <- Rao.table
+  Rao.table <- cbind(Rao.table, 
+                     sim.mean=rowMeans(Rao.table))
+  Rao.table <- cbind(Rao.table, 
+                     sim.sd=apply(Raw.table, 1, sd))
+  #Rao.table <- cbind(Rao.table, emp.val=) # I could add in the empirical values (FD)
+  #Rao.table <- cbind(Rao.table, ses=apply(Rao.table, 1, (Rao.table[,"mean"]))) # then I could calculate the SES straight away
+  return(Rao.table)
+}
+```
+
+Run the function a lot. I'll just quickly do 50 simulations here, but we should do many many more.
+```{r, eval=F}
+RQ <- nullFD(n.model=NULL,
+             n.iter=50, 
+             method="DNM", 
+             cores=6, 
+             trait.data=log(goanna.frame), 
+             measure="RaoQ", 
+             great.circle = gc.dist.fd)
+```
+
+If you don't have time to run those functions above, you'll want to read in the files
+```{r}
+RQ <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData.RDS")
+SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData_SES_raster.RDS")
+```
+
+Now we need to add the empirical FD (or richness) values to this data frame
+```{r}
+#RQ <- cbind(RQ, emp.val=res.table$RaoQ)
+RQ <- cbind(RQ, emp.val=res.table$FDis)
+```
+
+Then get standard effect sizes (SES) for each sell across all simulations
+```{r}
+ses.vec <- NULL
+for(k in 1:nrow(RQ)){
+  curr <- RQ[k,]
+  ses <- (curr$emp.val - curr$sim.mean) / curr$sim.sd
+  ses.vec <- append(ses.vec, ses)
+}
+# bind it to the simulation dataframe
+RQ <- cbind(RQ, ses=ses.vec)
+```
+
+Make a table of the ses values with the coordinates of each cell
+```{r}
+ses.table <- cbind.data.frame(latitude=gridded.dist$latitude, longitude=gridded.dist$longitude, SES=RQ$ses)
+```
+
+Bind the table with the empty raster cells we set up earlier, and make any NA values 0.
+```{r}
+combo.SES <- left_join(rr.cells, 
+                       ses.table, 
+                       by=c("latitude", "longitude"))
+```
+
+Make an empty raster frame for the ses values to go into  
+Dump them into the raster  
+And plot it to make sure it makes sense
+```{r}
+SESras <- rr; 
+SESras@data@values[] <- 0
+SESras@data@values <- combo.SES$SES
+#values(SESras) <- combo.SES$SES
+plot(SESras)
+```
+
+If you've been running all these steps, you'll want to save the output
+```{r, eval=F}
+saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData.RDS")
+saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData_SES_raster.RDS")
+```
+
+Have a quick look at some of the parameters
+```{r}
+densityplot(RQ$ses)
+densityplot(RQ$sim.mean)
+densityplot(RQ$emp.val)
+```
+
+Translate the SES raster into polygons for plotting with ggmap
+```{r}
+SESpoly <- rasterToPolygons(SESras); 
+max.colors <- length(unique(SESpoly$layer)); 
+filled.SES <- rep(SESpoly$layer, each=5) 
+```
+
+Lastly plot the map of SES (functional diversity)
+```{r}
+ggmap(graymap) + 
+  geom_polygon(data = SESpoly, 
+               aes(x = long, y = lat, group = group, 
+                   fill = filled.SES), size = 0, alpha = 1)  +
+  scale_fill_gradientn("SES", values=scales::rescale(c(min(ses.table$SES),
+                                              #min(ses.table$SES)/2,
+                                              -0.8,
+                                              0,
+                                              #max(ses.table$SES)/2,
+                                              0.8,
+                                              max(ses.table$SES))),
+                     colors = rev(brewer.pal(5, "RdYlBu"))) +
+  theme_classic()
+```
+
+We want to know if the difference in simulated and observed FD values is signficant. So we'll create a function to calculate the confidence interval of the SES.
+```{r}
+confidence_interval <- function(vector, interval) {
+  # Standard deviation of sample
+  vec_sd <- sd(vector)
+  # Sample size
+  n <- length(vector)
+  # Mean of sample
+  vec_mean <- mean(vector)
+  # Error according to t distribution
+  error <- qt((interval + 1)/2, df = n - 1) * vec_sd / sqrt(n)
+  # Confidence interval as a vector
+  result <- c("lower" = vec_mean - error, "upper" = vec_mean + error, 
+              "error" = error, "mean" = vec_mean, "sd" = vec_sd, "N" = n)
+  return(result)
+}
+```
+
+# Can also be calculated as:
+## upper = mean + (error * 1.96)
+## lower = mean - (error * 1.96)
+
+```{r}
+CIall <- confidence_interval(ses.table$SES, 0.95); CIall
+CIall["richness"] <- 1
+```
+
+```{r}
+siteRICH <- left_join(ses.table, 
+                     gridded.dist[,1:3], 
+                     by=c("longitude", "latitude"))
+```
+
+```{r}
+CIses <- NULL
+for (i in min(siteRICH$richness):max(siteRICH$richness)){
+  curr.rich <- filter(siteRICH, richness == i)
+  CIses <- rbind(CIses, confidence_interval(curr.rich$SES, 0.95))
+}
+CIses <- data.frame(CIses)
+CIses$richness <- 2:11
+plot(data=CIses, mean ~ richness)
+```
+
+Add the confidence interval for SES across the whole continent to the individual communities
+```{r}
+CIses <- rbind(CIses, CIall); CIses
+```
+
+```{r, message=F, warning=F}
+library(RColorBrewer)
+ggplot(CIses, aes(x=richness, y=mean)) + 
+  geom_bar(stat="identity", color="black", 
+           position=position_dodge(), 
+           fill = colorRampPalette(brewer.pal(9, "RdYlBu"))(11)) +
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=.2,
+                position=position_dodge(.9)) +
+  theme_bw()
+```
+
+\pagebreak
+
+# Spatial and Function Diversity of Marsupial Carnivores
+
+We can do run the same analyses to see what the patterns of richness and functional diversity are for dasyuromorph and peramelamorph marsupials.
+
+```{r}
+marsupial.tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Marsupial_Walkthrough.RDS")
+names(marsupial.tutorial)
+```
+
+Create a tibble from the distribution data, turn it into Site x Species tibble
+```{r}
+mgridded <- marsupial.tutorial$marsupial.distribution %>%
+  
+  ## bin into 0.5-degree bins
+  dplyr::mutate(longitude=round(Longitude*2)/2, latitude=round(Latitude*2)/2) %>%
+  
+  #  ## average environmental vars within each bin
+  group_by(longitude,latitude) %>%
+  #  mutate(precipitationAnnual=mean(precipitationAnnual, na.rm=TRUE),
+  #         temperatureAnnualMaxMean=mean(temperatureAnnualMaxMean, na.rm=TRUE)) %>%
+  
+  ## subset to vars of interest
+  dplyr::select(longitude, latitude, Name_in_Tree) %>%
+  
+  ## take one row per cell per species (presence)
+  distinct() %>%
+  
+  ## calculate species richness
+  dplyr::mutate(richness=n()) %>%
+  
+  ## convert to wide format (sites by species)
+  dplyr::mutate(present=1) %>%
+  do(tidyr::spread(data=., key=Name_in_Tree, value=present, fill=0)) %>%
+  ungroup()
+```
+
+\  
+
+Have a quick look at the Site x Species tibble, then translate it to a data frame we can manipulate normally.
+```{r}
+gridded.dist <- as.data.frame(mgridded)
+gridded.dist[1:5, 1:7]
+```
+
+Lots of sites don't have any records, and are listed as NAs. This won't jibe with our code, so switch NA to 0. 
+```{r}
+gridded.dist[is.na(gridded.dist)] <- 0 # make NAs 0
+gridded.dist <- filter(gridded.dist, !richness==1) # remove sites with just one taxon
+gridded.dist <- filter(gridded.dist, latitude <= -11); 
+gridded.dist <- filter(gridded.dist, longitude >= 113.5)
+gdist <- gridded.dist[ , 4:ncol(gridded.dist)]
+```
+
+Make the order of the trait dataframe match the order of the Site x Species DF
+```{r}
+marsupial.trait <- marsupial.tutorial$marsupial.sizes[match(colnames(gdist), 
+                                   marsupial.tutorial$marsupial.sizes$Name_in_Tree),]
+marsupial.frame <- data.frame(SVL = marsupial.trait$Body_Length); 
+rownames(marsupial.frame) <- marsupial.trait$Name_in_Tree
+```
+
+
+Run the Functional Diversity function and extract two estimates of fuctional diversity: the Rao's Quadratic value, and FDis
+```{r, message = F, warning = F}
+best <- dbFD(log(marsupial.frame), gdist)
+RQ.scores <- best$RaoQ
+FDis.scores <- best$FDis
+res.table <- cbind.data.frame(latitude=gridded.dist$latitude, 
+                              longitude=gridded.dist$longitude, 
+                              RaoQ=best$RaoQ, FDis=best$FDis)
+```
+
+Read in your shapefile
+```{r, warning = F, message = F}
+oz <- shapefile("~/Documents/GitHub/MonitorPhylogenomics/Map_Shapefiles/Australia.shp")
+plot(oz)
+```
+
+Set up a raster "template" for a 0.5 degree grid
+```{r}
+ext <- extent(113.2244, 153.6242, -43.64806, -10.70667)
+gridsize <- 0.5
+r <- raster(ext, res=gridsize)
+```
+
+Rasterize the shapefile
+```{r}
+rr <- rasterize(oz, r)
+```
+
+Plot raster
+```{r}
+plot(rr)
+```
+
+```{r}
+rr.cells <- xyFromCell(rr, 1:length(rr)); 
+rr.cells <- as.data.frame(rr.cells)
+rr.cells$x <- round(rr.cells$x*2)/2; 
+rr.cells$y <- round(rr.cells$y*2)/2
+colnames(rr.cells) <- c("longitude", "latitude")
+head(rr.cells)
+```
+
+Fill raster cells by FD values (Rao's Q, FDis), and visualize it.
+```{r}
+combo.Q <- left_join(rr.cells, 
+                     res.table, 
+                     by=c("longitude", "latitude"))
+FDras <- rr
+values(FDras) <- combo.Q$RaoQ
+plot(FDras)
+
+FDisras <- rr
+values(FDisras) <- combo.Q$FDis
+plot(FDisras)
+```
+
+Fill raster cells by richness and visualize it.
+```{r}
+combo.R <- left_join(rr.cells, 
+                     gridded.dist[,1:3], 
+                     by=c("longitude", "latitude"))
+RICHras <- rr
+values(RICHras) <- combo.R$richness
+plot(RICHras)
+```
+
+
+We can do this a bit prettier, start by establishing a map
+```{r}
+graymap <- get_googlemap(center = "Australia", zoom = 4, style = 'https://maps.googleapis.com/maps/api/staticmap?&center=-33.9,151.14999999999998&zoom=12&format=png&maptype=roadmap&style=element:geometry%7Ccolor:0xf5f5f5&style=element:labels%7Cvisibility:off&style=element:labels.icon%7Cvisibility:off&style=element:labels.text.fill%7Ccolor:0x616161&style=element:labels.text.stroke%7Ccolor:0xf5f5f5&style=feature:administrative%7Celement:geometry%7Cvisibility:off&style=feature:administrative.land_parcel%7Cvisibility:off&style=feature:administrative.land_parcel%7Celement:labels.text.fill%7Ccolor:0xbdbdbd&style=feature:administrative.neighborhood%7Cvisibility:off&style=feature:poi%7Cvisibility:off&style=feature:poi%7Celement:geometry%7Ccolor:0xeeeeee&style=feature:poi%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:poi.park%7Celement:geometry%7Ccolor:0xe5e5e5&style=feature:poi.park%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&style=feature:road%7Cvisibility:off&style=feature:road%7Celement:geometry%7Ccolor:0xffffff&style=feature:road%7Celement:labels.icon%7Cvisibility:off&style=feature:road.arterial%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:road.highway%7Celement:geometry%7Ccolor:0xdadada&style=feature:road.highway%7Celement:labels.text.fill%7Ccolor:0x616161&style=feature:road.local%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&style=feature:transit%7Cvisibility:off&style=feature:transit.line%7Celement:geometry%7Ccolor:0xe5e5e5&style=feature:transit.station%7Celement:geometry%7Ccolor:0xeeeeee&style=feature:water%7Celement:geometry%7Ccolor:0xc9c9c9&style=feature:water%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&size=480x360')
+ggmap(graymap)
+```
+
+Create richness polygons
+```{r, message = F, warning = F}
+RICHpoly <- rasterToPolygons(RICHras); 
+max.colors <- length(unique(RICHpoly$layer)); 
+filled.RICH <- rep(RICHpoly$layer, each=5) 
+# 'each' is important, otherwise the polygon values get screwed up
+```
+
+Set the color palette length and the breakpoints 
+```{r}
+RICHras@data@values[is.na(RICHras@data@values)] <- 0
+pal.length <- abs(min(RICHras@data@values) - max(RICHras@data@values)) * 10
+myBreaks <- c(seq(min(RICHras@data@values), 0, length.out=ceiling(pal.length/2) + 1), 
+              seq(max(RICHras@data@values)/pal.length, max(RICHras@data@values), 
+                  length.out=floor(pal.length/2)))
+```
+
+```{r, message = F, warning = F}
+ggmap(graymap) + 
+  geom_polygon(data = RICHpoly,
+               aes(x = long, y = lat, 
+                   group = group, 
+                   fill = filled.RICH), 
+               size = 0, alpha = 1)  +
+  scale_fill_gradientn("Richness",
+                       colors = rev(colorRampPalette(
+                         brewer.pal(9, "RdYlBu"))(max.colors))) +
+  theme_classic()
+```
+
+Do the same for functional diversity (choose either FDras or FDisras)
+```{r}
+FDpoly <- rasterToPolygons(FDras);
+#FDpoly <- rasterToPolygons(FDisras)
+max.colors <- length(unique(FDpoly$layer)); 
+filled.FD <- rep(FDpoly$layer, each=5) 
+# 'each' is important, otherwise the polygon values get screwed up
+```
+
+Set the color palette length and the breakpoints 
+```{r}
+FDras@data@values[is.na(FDras@data@values)] <- 0
+pal.length <- abs(min(FDras@data@values) - max(FDras@data@values)) * 10
+myBreaks <- c(seq(min(FDras@data@values), 0, length.out=ceiling(pal.length/2) + 1), 
+              seq(max(FDras@data@values)/pal.length, max(FDras@data@values), 
+                  length.out=floor(pal.length/2)))
+#FDras@data@values[which(FDras@data@values == 0)] <- "NA"
+```
+
+```{r, message=F, warning=F}
+ggmap(graymap) + 
+  geom_polygon(data = FDpoly, 
+               aes(x = long, 
+                   y = lat, 
+                   group = group, 
+                   fill = filled.FD), 
+               size = 0, alpha = 1)  +
+  scale_fill_gradientn("FD", 
+                       values=scales::rescale(c(min(res.table$RaoQ),
+                                                mean(res.table$RaoQ)/2,
+                                                mean(res.table$RaoQ),
+                                                mean(res.table$RaoQ)*2,
+                                                max(res.table$RaoQ))),
+                       colors = rev(colorRampPalette(
+                         brewer.pal(9, "RdYlBu"))(max.colors))) +
+
+  theme_classic()
+```
+
+
+We've plotted richness and functional diversity, but we'd like to know if either is significantly different than scores from random communities.  
+We've already got a community matrix ('gridded.dist'), so just copy that.
+```{r}
+cm <- gridded.dist
+```
+
+Create an empty raster or two
+```{r}
+richness.raster <- rr; richness.raster@data@values[] <- 0
+fd.raster <- rr; fd.raster@data@values[] <- 0
+```
+
+Add the FD and Richness scores to your community matrix
+```{r}
+pre.rr <- left_join(rr.cells, cm, by=c("latitude", "longitude")); pre.rr[is.na(pre.rr)] <- 0
+pre.fd <- left_join(rr.cells, res.table, by=c("latitude", "longitude"))
+    pre.fd <- left_join(pre.fd, cm, by=c("latitude", "longitude")); pre.fd[is.na(pre.fd)] <- 0
+```
+
+Pass along the values from the matrices to your rasters
+```{r}
+richness.raster@data@values <- pre.rr$richness
+fd.raster@data@values <- pre.fd$RaoQ
+#fd.raster@data@values <- pre.fd$FDis
+```
+
+Quickly plot them again to make sure they make sense and nothing funny happened
+```{r}
+plot(richness.raster)
+plot(fd.raster)
+```
+
+Identify which cells have richness values > 1 (more than one taxon occupying it)  
+Or identify which cells have functional diversity values > 0 (so we can compare)
+```{r}
+cells.rich <- which(richness.raster@data@values > 1)
+cells.fd <- which(fd.raster@data@values > 0)
+```
+
+
+Make your blank site x species matrices by choosing cells with richness (>1) and FD (>0)
+```{r}
+input.rr <- pre.rr[,4:ncol(pre.rr)]; 
+input.rr <- input.rr[which(rowSums(input.rr) > 1),]
+input.fd <- pre.fd[which(pre.fd$RaoQ > 0), 6:ncol(pre.fd)]
+#input.fd <- pre.fd[which(pre.fd$FDis > 0), 6:ncol(pre.fd)]
+```
+
+We can check this quickly by showing how many sites there were (including those with no observations), and how many we now have (including only those with observations)
+```{r, echo=F}
+paste(nrow(pre.rr), "total sites")
+paste(nrow(input.rr), "sites have >1 species present")
+paste(nrow(input.fd), "sites have >0 functional diversity")
+```
+
+Get the x (longitude) y (latitude) coordinates of those cells
+```{r}
+coords.rich <- xyFromCell(richness.raster, cells.rich)
+coords.fd <- xyFromCell(fd.raster, cells.fd)
+```
+
+Now create the greater circle distance (in meters) for each raster. This is an important input step for our 
+```{r}
+# for richness
+gc.dist.rich <- rdist.earth(coords.rich); 
+rownames(gc.dist.rich) <- cells.rich; 
+colnames(gc.dist.rich) <- cells.rich; 
+diag(gc.dist.rich) <- 0
+
+# for functional diversity
+gc.dist.fd <- rdist.earth(coords.fd); 
+rownames(gc.dist.fd) <- cells.fd; 
+colnames(gc.dist.fd) <- cells.fd; 
+diag(gc.dist.fd) <- 0
+```
+
+We'll need to source the dispersal null metric function
+```{r}
+source("~/Documents/GitHub/MonitorPhylogenomics/DispersalNullModel.R")
+```
+
+And create an additional function to run this null model repeatedly
+```{r}
+library(parallel)
+nullFD <- function(n.model, n.iter, 
+                   method=c("randomizeMatrix", "DNM"), 
+                   cores, trait.data, measure=c("RaoQ", "FDis", "Richness"), 
+                   great.circle){
+  
+  beginning <- Sys.time()
+  Rao.table <- NULL
+  
+  if(method=="randomizeMatrix"){
+    swap <- mclapply(1:n.iter, function(x) {
+      randomizeMatrix(input.fd, 
+                      null.model=n.model, 
+                      iterations=10)}, 
+      mc.cores=cores)
+    swap.res <- mclapply(1:length(swap), function(x) {
+      dbFD(trait.frame, swap[[x]])}, mc.cores=8)
+    
+    for(j in 1:length(swap.res)){
+      Rao.table <- cbind(Rao.table, swap.res[[j]]$RaoQ)
+    }
+  }
+  else if(method=="DNM"){
+    swap <- mclapply(1:n.iter, function(x) {
+      DNM(input.fd, tree=NA, 
+          great.circle, abundance.matters=F,
+          abundance.assigned="directly")}, mc.cores=cores)
+    swap <- Filter(function(x) length(x)>1, swap)
+    # Get FD
+    if (measure=="RaoQ"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        dbFD(trait.data, swap[[x]])}, mc.cores=8)
+      for(j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]]$RaoQ)
+      }
+    }
+    else if (measure=="FDis"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        dbFD(trait.data, swap[[x]])}, mc.cores=8)
+      for(j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]]$FDis)
+      }
+    }
+    # or Get RICHNESS
+    else if (measure=="Richness"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        rowSums(swap[[x]])}, mc.cores=8)
+      for (j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]])
+      }
+    }
+    
+    print(paste("you attempted", n.iter, 
+                "iterations, and you got", 
+                length(swap), "simulations"))
+
+  }
+  
+  end <- Sys.time()
+  duration <- format(end-beginning)
+  print(paste("Computation time to fit", n.iter, 
+              method, "null models:", duration))
+  
+  Rao.table <- as.data.frame(Rao.table); 
+  Raw.table <- Rao.table
+  Rao.table <- cbind(Rao.table, 
+                     sim.mean=rowMeans(Rao.table))
+  Rao.table <- cbind(Rao.table, 
+                     sim.sd=apply(Raw.table, 1, sd))
+  #Rao.table <- cbind(Rao.table, emp.val=) # I could add in the empirical values (FD)
+  #Rao.table <- cbind(Rao.table, ses=apply(Rao.table, 1, (Rao.table[,"mean"]))) # then I could calculate the SES straight away
+  return(Rao.table)
+}
+```
+
+Run the function a lot. I'll just quickly do 50 simulations here, but we should do many many more.
+```{r, eval=F}
+RQ <- nullFD(n.model=NULL,
+             n.iter=50, 
+             method="DNM", 
+             cores=6, 
+             trait.data=log(marsupial.frame), 
+             measure="RaoQ", 
+             great.circle = gc.dist.fd)
+```
+
+If you don't have time to run those functions above, you'll want to read in the files
+```{r}
+RQ <-     readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData.RDS")
+SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData_SES_raster.RDS")
+```
+
+Now we need to add the empirical FD (or richness) values to this data frame
+```{r}
+#RQ <- cbind(RQ, emp.val=res.table$RaoQ)
+RQ <- cbind(RQ, emp.val=res.table$FDis)
+```
+
+Then get standard effect sizes (SES) for each sell across all simulations
+```{r}
+ses.vec <- NULL
+for(k in 1:nrow(RQ)){
+  curr <- RQ[k,]
+  ses <- (curr$emp.val - curr$sim.mean) / curr$sim.sd
+  ses.vec <- append(ses.vec, ses)
+}
+# bind it to the simulation dataframe
+RQ <- cbind(RQ, ses=ses.vec)
+```
+
+Make a table of the ses values with the coordinates of each cell
+```{r}
+ses.table <- cbind.data.frame(latitude=gridded.dist$latitude, longitude=gridded.dist$longitude, SES=RQ$ses)
+```
+
+Bind the table with the empty raster cells we set up earlier, and make any NA values 0.
+```{r}
+combo.SES <- left_join(rr.cells, 
+                       ses.table, 
+                       by=c("latitude", "longitude"))
+```
+
+Make an empty raster frame for the ses values to go into  
+Dump them into the raster  
+And plot it to make sure it makes sense
+```{r}
+SESras <- rr; 
+SESras@data@values[] <- 0
+SESras@data@values <- combo.SES$SES
+#values(SESras) <- combo.SES$SES
+plot(SESras)
+```
+
+If you've been running all these steps, you'll want to save the output
+```{r, eval=F}
+saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData.RDS")
+saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData_SES_raster.RDS")
+```
+
+Have a quick look at some of the parameters
+```{r}
+densityplot(RQ$ses)
+densityplot(RQ$sim.mean)
+densityplot(RQ$emp.val)
+```
+
+Translate the SES raster into polygons for plotting with ggmap
+```{r}
+SESpoly <- rasterToPolygons(SESras); 
+max.colors <- length(unique(SESpoly$layer)); 
+filled.SES <- rep(SESpoly$layer, each=5) 
+```
+
+Lastly plot the map of SES (functional diversity)
+```{r}
+ggmap(graymap) + 
+  geom_polygon(data = SESpoly, 
+               aes(x = long, y = lat, group = group, 
+                   fill = filled.SES), size = 0, alpha = 1)  +
+  scale_fill_gradientn("SES", values=scales::rescale(c(min(ses.table$SES),
+                                              #min(ses.table$SES)/2,
+                                              -0.8,
+                                              0,
+                                              #max(ses.table$SES)/2,
+                                              0.8,
+                                              max(ses.table$SES))),
+                     colors = rev(brewer.pal(5, "RdYlBu"))) +
+  theme_classic()
+```
+
+We want to know if the difference in simulated and observed FD values is signficant. So we'll create a function to calculate the confidence interval of the SES.
+```{r}
+confidence_interval <- function(vector, interval) {
+  # Standard deviation of sample
+  vec_sd <- sd(vector)
+  # Sample size
+  n <- length(vector)
+  # Mean of sample
+  vec_mean <- mean(vector)
+  # Error according to t distribution
+  error <- qt((interval + 1)/2, df = n - 1) * vec_sd / sqrt(n)
+  # Confidence interval as a vector
+  result <- c("lower" = vec_mean - error, "upper" = vec_mean + error, 
+              "error" = error, "mean" = vec_mean, "sd" = vec_sd, "N" = n)
+  return(result)
+}
+```
+
+# Can also be calculated as:
+## upper = mean + (error * 1.96)
+## lower = mean - (error * 1.96)
+
+```{r}
+CIall <- confidence_interval(ses.table$SES, 0.95); CIall
+CIall["richness"] <- 1
+```
+
+```{r}
+siteRICH <- left_join(ses.table, 
+                     gridded.dist[,1:3], 
+                     by=c("longitude", "latitude"))
+```
+
+```{r}
+CIses <- NULL
+for (i in min(siteRICH$richness):max(siteRICH$richness)){
+  curr.rich <- filter(siteRICH, richness == i)
+  CIses <- rbind(CIses, confidence_interval(curr.rich$SES, 0.95))
+}
+CIses <- data.frame(CIses)
+CIses$richness <- 2:14
+plot(data=CIses, mean ~ richness)
+```
+
+Add the confidence interval for SES across the whole continent to the individual communities
+```{r}
+CIses <- rbind(CIses, CIall); CIses
+```
+
+```{r, message=F, warning=F}
+library(RColorBrewer)
+ggplot(CIses, aes(x=richness, y=mean)) + 
+  geom_bar(stat="identity", color="black", 
+           position=position_dodge(), 
+           fill = colorRampPalette(brewer.pal(9, "RdYlBu"))(14)) +
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=.2,
+                position=position_dodge(.9)) +
+  theme_bw()
+```
+
+\pagebreak
+
+
+\pagebreak
+
+# Spatial Coevolution of *Varanus* and Marsupials
+
+Great, now we want to do the same spatial analyses for both the monitor lizards and the cohabiting marsupials.
+
+```{r}
+cospatial.tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/CoSpatial_Walkthrough.RDS")
+names(cospatial.tutorial)
+```
+
+Combine the two distribution data frames
+```{r}
+co.distribution <- rbind(cospatial.tutorial$goanna.distribution, 
+                         cospatial.tutorial$marsupial.distribution)
+```
+
+Create a tibble from the distribution data, turn it into Site x Species tibble
+```{r}
+cogridded <- co.distribution %>%
+  
+  ## bin into 0.5-degree bins
+  dplyr::mutate(longitude=round(Longitude*2)/2, latitude=round(Latitude*2)/2) %>%
+  
+  #  ## average environmental vars within each bin
+  group_by(longitude,latitude) %>%
+  #  mutate(precipitationAnnual=mean(precipitationAnnual, na.rm=TRUE),
+  #         temperatureAnnualMaxMean=mean(temperatureAnnualMaxMean, na.rm=TRUE)) %>%
+  
+  ## subset to vars of interest
+  dplyr::select(longitude, latitude, Name_in_Tree) %>%
+  
+  ## take one row per cell per species (presence)
+  distinct() %>%
+  
+  ## calculate species richness
+  dplyr::mutate(richness=n()) %>%
+  
+  ## convert to wide format (sites by species)
+  dplyr::mutate(present=1) %>%
+  do(tidyr::spread(data=., key=Name_in_Tree, value=present, fill=0)) %>%
+  ungroup()
+```
+
+
+\  
+
+Have a quick look at the Site x Species tibble, then translate it to a data frame we can manipulate normally.
+```{r}
+gridded.dist <- as.data.frame(cogridded)
+gridded.dist[1:5, 1:7]
+```
+
+Lots of sites don't have any records, and are listed as NAs. This won't jibe with our code, so switch NA to 0. 
+```{r}
+gridded.dist[is.na(gridded.dist)] <- 0 # make NAs 0
+gridded.dist <- filter(gridded.dist, !richness==1) # remove sites with just one taxon
+gridded.dist <- filter(gridded.dist, latitude <= -11); 
+gridded.dist <- filter(gridded.dist, longitude >= 113.5)
+gdist <- gridded.dist[ , 4:ncol(gridded.dist)]
+```
+
+Combine the marsupial and goanna trait data into a single data frame
+```{r}
+co.trait <- rbind(cospatial.tutorial$goanna.sizes,
+                  cospatial.tutorial$marsupial.sizes)
+co.trait[1:5,]
+co.trait[33:37,]
+```
+
+Make the order of the trait dataframe match the order of the Site x Species DF
+```{r}
+both.trait <- co.trait[match(colnames(gdist), 
+                                   co.trait$Name_in_Tree),]
+both.frame <- data.frame(SVL = both.trait$Body_Length); 
+rownames(both.frame) <- both.trait$Name_in_Tree
+```
+
+
+Run the Functional Diversity function and extract two estimates of fuctional diversity: the Rao's Quadratic value, and FDis
+```{r, message = F, warning = F}
+best <- dbFD(log(both.frame), gdist)
+RQ.scores <- best$RaoQ
+FDis.scores <- best$FDis
+res.table <- cbind.data.frame(latitude=gridded.dist$latitude, 
+                              longitude=gridded.dist$longitude, 
+                              RaoQ=best$RaoQ, FDis=best$FDis)
+```
+
+Read in your shapefile
+```{r, warning = F, message = F}
+oz <- shapefile("~/Documents/GitHub/MonitorPhylogenomics/Map_Shapefiles/Australia.shp")
+plot(oz)
+```
+
+Set up a raster "template" for a 0.5 degree grid
+```{r}
+ext <- extent(113.2244, 153.6242, -43.64806, -10.70667)
+gridsize <- 0.5
+r <- raster(ext, res=gridsize)
+```
+
+Rasterize the shapefile
+```{r}
+rr <- rasterize(oz, r)
+```
+
+Plot raster
+```{r}
+plot(rr)
+```
+
+```{r}
+rr.cells <- xyFromCell(rr, 1:length(rr)); 
+rr.cells <- as.data.frame(rr.cells)
+rr.cells$x <- round(rr.cells$x*2)/2; 
+rr.cells$y <- round(rr.cells$y*2)/2
+colnames(rr.cells) <- c("longitude", "latitude")
+head(rr.cells)
+```
+
+Fill raster cells by FD values (Rao's Q, FDis), and visualize it.
+```{r}
+combo.Q <- left_join(rr.cells, 
+                     res.table, 
+                     by=c("longitude", "latitude"))
+FDras <- rr
+values(FDras) <- combo.Q$RaoQ
+plot(FDras)
+
+FDisras <- rr
+values(FDisras) <- combo.Q$FDis
+plot(FDisras)
+```
+
+Fill raster cells by richness and visualize it.
+```{r}
+combo.R <- left_join(rr.cells, 
+                     gridded.dist[,1:3], 
+                     by=c("longitude", "latitude"))
+RICHras <- rr
+values(RICHras) <- combo.R$richness
+plot(RICHras)
+```
+
+
+We can do this a bit prettier, start by establishing a map
+```{r}
+graymap <- get_googlemap(center = "Australia", zoom = 4, style = 'https://maps.googleapis.com/maps/api/staticmap?&center=-33.9,151.14999999999998&zoom=12&format=png&maptype=roadmap&style=element:geometry%7Ccolor:0xf5f5f5&style=element:labels%7Cvisibility:off&style=element:labels.icon%7Cvisibility:off&style=element:labels.text.fill%7Ccolor:0x616161&style=element:labels.text.stroke%7Ccolor:0xf5f5f5&style=feature:administrative%7Celement:geometry%7Cvisibility:off&style=feature:administrative.land_parcel%7Cvisibility:off&style=feature:administrative.land_parcel%7Celement:labels.text.fill%7Ccolor:0xbdbdbd&style=feature:administrative.neighborhood%7Cvisibility:off&style=feature:poi%7Cvisibility:off&style=feature:poi%7Celement:geometry%7Ccolor:0xeeeeee&style=feature:poi%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:poi.park%7Celement:geometry%7Ccolor:0xe5e5e5&style=feature:poi.park%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&style=feature:road%7Cvisibility:off&style=feature:road%7Celement:geometry%7Ccolor:0xffffff&style=feature:road%7Celement:labels.icon%7Cvisibility:off&style=feature:road.arterial%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:road.highway%7Celement:geometry%7Ccolor:0xdadada&style=feature:road.highway%7Celement:labels.text.fill%7Ccolor:0x616161&style=feature:road.local%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&style=feature:transit%7Cvisibility:off&style=feature:transit.line%7Celement:geometry%7Ccolor:0xe5e5e5&style=feature:transit.station%7Celement:geometry%7Ccolor:0xeeeeee&style=feature:water%7Celement:geometry%7Ccolor:0xc9c9c9&style=feature:water%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&size=480x360')
+ggmap(graymap)
+```
+
+Create richness polygons
+```{r, message = F, warning = F}
+RICHpoly <- rasterToPolygons(RICHras); 
+max.colors <- length(unique(RICHpoly$layer)); 
+filled.RICH <- rep(RICHpoly$layer, each=5) 
+# 'each' is important, otherwise the polygon values get screwed up
+```
+
+Set the color palette length and the breakpoints 
+```{r}
+RICHras@data@values[is.na(RICHras@data@values)] <- 0
+pal.length <- abs(min(RICHras@data@values) - max(RICHras@data@values)) * 10
+myBreaks <- c(seq(min(RICHras@data@values), 0, length.out=ceiling(pal.length/2) + 1), 
+              seq(max(RICHras@data@values)/pal.length, max(RICHras@data@values), 
+                  length.out=floor(pal.length/2)))
+```
+
+```{r, message = F, warning = F}
+ggmap(graymap) + 
+  geom_polygon(data = RICHpoly,
+               aes(x = long, y = lat, 
+                   group = group, 
+                   fill = filled.RICH), 
+               size = 0, alpha = 1)  +
+  scale_fill_gradientn("Richness",
+                       colors = rev(colorRampPalette(
+                         brewer.pal(9, "RdYlBu"))(max.colors))) +
+  theme_classic()
+```
+
+Do the same for functional diversity (choose either FDras or FDisras)
+```{r}
+FDpoly <- rasterToPolygons(FDras);
+#FDpoly <- rasterToPolygons(FDisras)
+max.colors <- length(unique(FDpoly$layer)); 
+filled.FD <- rep(FDpoly$layer, each=5) 
+# 'each' is important, otherwise the polygon values get screwed up
+```
+
+Set the color palette length and the breakpoints 
+```{r}
+FDras@data@values[is.na(FDras@data@values)] <- 0
+pal.length <- abs(min(FDras@data@values) - max(FDras@data@values)) * 10
+myBreaks <- c(seq(min(FDras@data@values), 0, length.out=ceiling(pal.length/2) + 1), 
+              seq(max(FDras@data@values)/pal.length, max(FDras@data@values), 
+                  length.out=floor(pal.length/2)))
+#FDras@data@values[which(FDras@data@values == 0)] <- "NA"
+```
+
+```{r, message=F, warning=F}
+ggmap(graymap) + 
+  geom_polygon(data = FDpoly, 
+               aes(x = long, 
+                   y = lat, 
+                   group = group, 
+                   fill = filled.FD), 
+               size = 0, alpha = 1)  +
+  scale_fill_gradientn("FD", 
+                       values=scales::rescale(c(min(res.table$RaoQ),
+                                                mean(res.table$RaoQ)/2,
+                                                mean(res.table$RaoQ),
+                                                mean(res.table$RaoQ)*2,
+                                                max(res.table$RaoQ))),
+                       colors = rev(colorRampPalette(
+                         brewer.pal(9, "RdYlBu"))(max.colors))) +
+
+  theme_classic()
+```
+
+\pagebreak
+
+We've plotted richness and functional diversity, but we'd like to know if either is significantly different than scores from random communities.  
+We've already got a community matrix ('gridded.dist'), so just copy that.
+```{r}
+cm <- gridded.dist
+```
+
+Create an empty raster or two
+```{r}
+richness.raster <- rr; richness.raster@data@values[] <- 0
+fd.raster <- rr; fd.raster@data@values[] <- 0
+```
+
+Add the FD and Richness scores to your community matrix
+```{r}
+pre.rr <- left_join(rr.cells, cm, by=c("latitude", "longitude")); pre.rr[is.na(pre.rr)] <- 0
+pre.fd <- left_join(rr.cells, res.table, by=c("latitude", "longitude"))
+    pre.fd <- left_join(pre.fd, cm, by=c("latitude", "longitude")); pre.fd[is.na(pre.fd)] <- 0
+```
+
+Pass along the values from the matrices to your rasters
+```{r}
+richness.raster@data@values <- pre.rr$richness
+fd.raster@data@values <- pre.fd$RaoQ
+#fd.raster@data@values <- pre.fd$FDis
+```
+
+Quickly plot them again to make sure they make sense and nothing funny happened
+```{r}
+plot(richness.raster)
+plot(fd.raster)
+```
+
+Identify which cells have richness values > 1 (more than one taxon occupying it)  
+Or identify which cells have functional diversity values > 0 (so we can compare)
+```{r}
+cells.rich <- which(richness.raster@data@values > 1)
+cells.fd <- which(fd.raster@data@values > 0)
+```
+
+
+Make your blank site x species matrices by choosing cells with richness (>1) and FD (>0)
+```{r}
+input.rr <- pre.rr[,4:ncol(pre.rr)]; 
+input.rr <- input.rr[which(rowSums(input.rr) > 1),]
+input.fd <- pre.fd[which(pre.fd$RaoQ >= 0), 6:ncol(pre.fd)]
+#input.fd <- pre.fd[which(pre.fd$FDis > 0), 6:ncol(pre.fd)]
+```
+
+We can check this quickly by showing how many sites there were (including those with no observations), and how many we now have (including only those with observations)
+```{r, echo=F}
+paste(nrow(pre.rr), "total sites")
+paste(nrow(input.rr), "sites have >1 species present")
+paste(nrow(input.fd), "sites have >0 functional diversity")
+```
+
+Get the x (longitude) y (latitude) coordinates of those cells
+```{r}
+coords.rich <- xyFromCell(richness.raster, cells.rich)
+coords.fd <- xyFromCell(fd.raster, cells.fd)
+```
+
+Now create the greater circle distance (in meters) for each raster. This is an important input step for our 
+```{r}
+# for richness
+gc.dist.rich <- rdist.earth(coords.rich); 
+rownames(gc.dist.rich) <- cells.rich; 
+colnames(gc.dist.rich) <- cells.rich; 
+diag(gc.dist.rich) <- 0
+
+# for functional diversity
+gc.dist.fd <- rdist.earth(coords.fd); 
+rownames(gc.dist.fd) <- cells.fd; 
+colnames(gc.dist.fd) <- cells.fd; 
+diag(gc.dist.fd) <- 0
+```
+
+We'll need to source the dispersal null metric function
+```{r}
+source("~/Documents/GitHub/MonitorPhylogenomics/DispersalNullModel.R")
+```
+
+And create an additional function to run this null model repeatedly
+```{r}
+library(parallel)
+nullFD <- function(n.model, n.iter, 
+                   method=c("randomizeMatrix", "DNM"), 
+                   cores, trait.data, measure=c("RaoQ", "FDis", "Richness"), 
+                   great.circle){
+  
+  beginning <- Sys.time()
+  Rao.table <- NULL
+  
+  if(method=="randomizeMatrix"){
+    swap <- mclapply(1:n.iter, function(x) {
+      randomizeMatrix(input.fd, 
+                      null.model=n.model, 
+                      iterations=10)}, 
+      mc.cores=cores)
+    swap.res <- mclapply(1:length(swap), function(x) {
+      dbFD(trait.frame, swap[[x]])}, mc.cores=8)
+    
+    for(j in 1:length(swap.res)){
+      Rao.table <- cbind(Rao.table, swap.res[[j]]$RaoQ)
+    }
+  }
+  else if(method=="DNM"){
+    swap <- mclapply(1:n.iter, function(x) {
+      DNM(input.fd, tree=NA, 
+          great.circle, abundance.matters=F,
+          abundance.assigned="directly")}, mc.cores=cores)
+    swap <- Filter(function(x) length(x)>1, swap)
+    # Get FD
+    if (measure=="RaoQ"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        dbFD(trait.data, swap[[x]])}, mc.cores=8)
+      for(j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]]$RaoQ)
+      }
+    }
+    else if (measure=="FDis"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        dbFD(trait.data, swap[[x]])}, mc.cores=8)
+      for(j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]]$FDis)
+      }
+    }
+    # or Get RICHNESS
+    else if (measure=="Richness"){
+      swap.res <- mclapply(1:length(swap), function(x) {
+        rowSums(swap[[x]])}, mc.cores=8)
+      for (j in 1:length(swap.res)){
+        Rao.table <- cbind(Rao.table, swap.res[[j]])
+      }
+    }
+    
+    print(paste("you attempted", n.iter, 
+                "iterations, and you got", 
+                length(swap), "simulations"))
+
+  }
+  
+  end <- Sys.time()
+  duration <- format(end-beginning)
+  print(paste("Computation time to fit", n.iter, 
+              method, "null models:", duration))
+  
+  Rao.table <- as.data.frame(Rao.table); 
+  Raw.table <- Rao.table
+  Rao.table <- cbind(Rao.table, 
+                     sim.mean=rowMeans(Rao.table))
+  Rao.table <- cbind(Rao.table, 
+                     sim.sd=apply(Raw.table, 1, sd))
+  #Rao.table <- cbind(Rao.table, emp.val=) # I could add in the empirical values (FD)
+  #Rao.table <- cbind(Rao.table, ses=apply(Rao.table, 1, (Rao.table[,"mean"]))) # then I could calculate the SES straight away
+  return(Rao.table)
+}
+```
+
+Run the function a lot. I'll just quickly do 50 simulations here, but we should do many many more.
+```{r, eval=F}
+RQ <- nullFD(n.model=NULL,
+             n.iter=50, 
+             method="DNM", 
+             cores=6, 
+             trait.data=log(both.frame), 
+             measure="RaoQ", 
+             great.circle = gc.dist.fd)
+```
+
+If you don't have time to run the above functions, you'll want to read in the files
+```{r}
+RQ <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData.RDS")
+SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData_SES_raster.RDS")
+```
+
+Now we need to add the empirical FD (or richness) values to this data frame
+```{r}
+#RQ <- cbind(RQ, emp.val=res.table$RaoQ)
+RQ <- cbind(RQ, emp.val=res.table$FDis)
+```
+
+Then get standard effect sizes (SES) for each sell across all simulations
+```{r}
+ses.vec <- NULL
+for(k in 1:nrow(RQ)){
+  curr <- RQ[k,]
+  ses <- (curr$emp.val - curr$sim.mean) / curr$sim.sd
+  ses.vec <- append(ses.vec, ses)
+}
+# bind it to the simulation dataframe
+RQ <- cbind(RQ, ses=ses.vec)
+```
+
+Make a table of the ses values with the coordinates of each cell
+```{r}
+ses.table <- cbind.data.frame(latitude=gridded.dist$latitude, longitude=gridded.dist$longitude, SES=RQ$ses)
+```
+
+Bind the table with the empty raster cells we set up earlier, and make any NA values 0.
+```{r}
+combo.SES <- left_join(rr.cells, 
+                       ses.table, 
+                       by=c("latitude", "longitude"))
+```
+
+Make an empty raster frame for the ses values to go into  
+Dump them into the raster  
+And plot it to make sure it makes sense
+```{r}
+SESras <- rr; 
+SESras@data@values[] <- 0
+SESras@data@values <- combo.SES$SES
+#values(SESras) <- combo.SES$SES
+plot(SESras)
+```
+
+If you've been running all these steps from scratch, you'll want to save the output
+```{r, eval=F}
+saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData.RDS")
+saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData_SES_raster.RDS")
+```
+
+Have a quick look at some of the parameters
+```{r}
+densityplot(RQ$ses)
+densityplot(RQ$sim.mean)
+densityplot(RQ$emp.val)
+```
+
+Translate the SES raster into polygons for plotting with ggmap
+```{r}
+SESpoly <- rasterToPolygons(SESras); 
+max.colors <- length(unique(SESpoly$layer)); 
+filled.SES <- rep(SESpoly$layer, each=5) 
+```
+
+Lastly plot the map of SES (functional diversity)
+```{r}
+ggmap(graymap) + 
+  geom_polygon(data = SESpoly, 
+               aes(x = long, y = lat, group = group, 
+                   fill = filled.SES), size = 0, alpha = 1)  +
+  scale_fill_gradientn("SES", values=scales::rescale(c(min(ses.table$SES),
+                                              #min(ses.table$SES)/2,
+                                              -0.8,
+                                              0,
+                                              #max(ses.table$SES)/2,
+                                              0.8,
+                                              max(ses.table$SES))),
+                     colors = rev(brewer.pal(5, "RdYlBu"))) +
+  theme_classic()
+```
+
+We want to know if the difference in simulated and observed FD values is signficant. So we'll create a function to calculate the confidence interval of the SES.
+```{r}
+confidence_interval <- function(vector, interval) {
+  # Standard deviation of sample
+  vec_sd <- sd(vector)
+  # Sample size
+  n <- length(vector)
+  # Mean of sample
+  vec_mean <- mean(vector)
+  # Error according to t distribution
+  error <- qt((interval + 1)/2, df = n - 1) * vec_sd / sqrt(n)
+  # Confidence interval as a vector
+  result <- c("lower" = vec_mean - error, "upper" = vec_mean + error, 
+              "error" = error, "mean" = vec_mean, "sd" = vec_sd, "N" = n)
+  return(result)
+}
+```
+
+# Can also be calculated as:
+## upper = mean + (error * 1.96)
+## lower = mean - (error * 1.96)
+
+```{r}
+CIall <- confidence_interval(ses.table$SES, 0.95); CIall
+CIall["richness"] <- 1
+```
+
+```{r}
+siteRICH <- left_join(ses.table, 
+                     gridded.dist[,1:3], 
+                     by=c("longitude", "latitude"))
+```
+
+```{r}
+CIses <- NULL
+for (i in min(siteRICH$richness):max(siteRICH$richness)){
+  curr.rich <- filter(siteRICH, richness == i)
+  CIses <- rbind(CIses, confidence_interval(curr.rich$SES, 0.95))
+}
+CIses <- data.frame(CIses)
+CIses$richness <- 2:17
+plot(data=CIses, mean ~ richness)
+```
+
+There's also an easier way to do this with 'group.CI'
+```{r}
+library(Rmisc)
+CIses2 <- group.CI(SES ~ richness,
+         data=siteRICH,
+         ci = 0.90)
+```
+
+Add the confidence interval for SES across the whole continent to the individual communities
+```{r}
+CIses <- rbind(CIses, CIall); CIses
+```
+
+```{r, message=F, warning=F}
+library(RColorBrewer)
+ggplot(CIses, aes(x=richness, y=mean)) + 
+  geom_bar(stat="identity", color="black", 
+           position=position_dodge(), 
+           fill = colorRampPalette(brewer.pal(9, "RdYlBu"))(17)) +
+  geom_errorbar(aes(ymin=mean-error, ymax=mean+error), width=.2,
+                position=position_dodge(.9)) +
+  theme_bw()
+```

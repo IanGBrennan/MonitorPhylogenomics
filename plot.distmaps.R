@@ -38,7 +38,8 @@ plot.distmaps <- function(distribution.table, new.directory=NULL, base.map=NULL,
     
     if (is.null(base.map)) {
       sbbox <- make_bbox(lon = distribution.table$Longitude, lat = distribution.table$Latitude, f = .1)
-      sq_map <- get_map(location = sbbox, maptype = "terrain", source = "google")
+      #sq_map <- get_map(location = sbbox, maptype = "terrain", source = "google")
+      sq_map <- get_stamenmap(bbox = sbbox, zoom = 3, maptype = "toner")
     } else {sq_map <- base.map}
   }
   

@@ -7,6 +7,7 @@ output:
   #  toc: yes
   pdf_document:
     toc: yes
+linkcolor: "magenta"
 ---
 
 ```{r setup, include=FALSE}
@@ -59,9 +60,9 @@ library(RColorBrewer)
 
 Now read in and have a quick look at our data.
 ```{r, eval=T, fig.height=10}
-gtree <- read.tree("Varanidae_STRICT_HKY_270_con.newick");
+gtree <- read.tree("~/Documents/GitHub/MonitorPhylogenomics/Varanidae_STRICT_HKY_270_con.newick");
 plot.phylo(gtree)
-alldata <- read.csv("All_Size_Data.csv", header=T)
+alldata <- read.csv("~/Documents/GitHub/MonitorPhylogenomics/Trait_Evo/All_Size_Data.csv", header=T)
 head(alldata)
 
 ```
@@ -71,7 +72,7 @@ head(alldata)
 Use treeplyr to combine the data, then remove any missing
 ```{r, eval=T, tidy=T, tidy.opts=list(width.cutoff=60)}
 goanna <- make.treedata(gtree, alldata); # summary(goanna)
-gf <- filter(goanna, is.na(Tail)==FALSE, is.na(SVL)==FALSE);
+gf <- filter(goanna, is.na(Habitat)==FALSE, is.na(Tail)==FALSE, is.na(SVL)==FALSE);
 ```
 
 \  
@@ -86,11 +87,22 @@ gf <- mutate(gf, logSVL = log(gf$dat$SVL))
 
 Start visualizing the trait using 'contMap' from 'phytools'
 ```{r, eval=T, fig.height=10}
-obj1 <- contMap(gf$phy, getVector(gf, logSVL), plot=FALSE, outline=F); 
+obj1 <- contMap(gf$phy, treeplyr::getVector(gf, logSVL), plot=FALSE, outline=F); 
 n<-length(obj1$cols); 
 obj1$cols[1:n] <- rev(colorRampPalette(brewer.pal(9, "YlGnBu"))(n));
 plot(obj1, legend=0.7*max(nodeHeights(obj1$tree)),
      fsize=c(0.7,0.9), lwd=5, border=F); axisPhylo(1, backward=T)
+```
+
+\  
+
+Plot the distribution of habitat usage
+
+```{r, eval=T, fig.height=10}
+habitat.data <- treeplyr::getVector(gf, Habitat)
+testo <- make.simmap(gf$phy, habitat.data)
+cols <- brewer.pal(4, "Paired"); names(cols) <- c("saxicolous", "semiaquatic", "terrestrial", "arboreal")
+plot(testo, cols)
 ```
 
 \  
@@ -150,7 +162,7 @@ source("~/Documents/GitHub/MonitorPhylogenomics/search.surface.R")
 
 We're going to turn our focus over to the Australian radiation of monitor lizards now, so we can load some existing files.  
 ```{r}
-tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Goanna_Walkthrough.RDS")
+tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Trait_Evo/Goanna_Walkthrough.RDS")
 # this includes a tree, size data, distribution data, and a processed rase object
 names(tutorial)
 ```
