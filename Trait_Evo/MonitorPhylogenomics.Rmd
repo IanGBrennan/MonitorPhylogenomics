@@ -101,7 +101,11 @@ Plot the distribution of habitat usage
 ```{r, eval=T, fig.height=10}
 habitat.data <- treeplyr::getVector(gf, Habitat)
 testo <- make.simmap(gf$phy, habitat.data)
-cols <- brewer.pal(4, "Paired"); names(cols) <- c("saxicolous", "semiaquatic", "terrestrial", "arboreal")
+cols <- brewer.pal(4, "Paired"); 
+names(cols) <- c("saxicolous", 
+                 "semiaquatic", 
+                 "terrestrial", 
+                 "arboreal")
 plot(testo, cols)
 ```
 
@@ -361,7 +365,7 @@ Now we need to build & fit a set of models just to the goanna data to compare wi
 Let's start with the basics (BM, OU), then move into some more complex models.  
 
 ```{r, eval=T, echo=F}
-load("~/Documents/GitHub/MonitorPhylogenomics/Varanus_Empirical_ModelObjects.RData")
+load("Varanus_Empirical_ModelObjects.RData")
 ```
 
 ### Brownian Motion (BM)
@@ -484,7 +488,7 @@ save(modelBM, fitBM,
 
 To save time, I haven't run these models here, so we'll read in an r data file with the models instead.
 ```{r}
-load("~/Documents/GitHub/MonitorPhylogenomics/Varanus_Empirical_ModelObjects.RData")
+load("Varanus_Empirical_ModelObjects.RData")
 ```
 
 Summarize the model fits
@@ -554,7 +558,7 @@ In general the steps follow the same process as with one clade. We need to:
 
 We already have our monitor lizard tree and data, but we'll start somewhere near scratch again, in case you've just jumped to this point.  
 ```{r}
-coevo <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/CoEvo_Walkthrough.RDS")
+coevo <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Trait_Evo/CoEvo_Walkthrough.RDS")
 names(coevo)
 ```
 This includes two tree files (**goanna.tree**, **marsupial.tree**), corresponding body size information (**size.data**), occurrence records for both clades (**goanna.distribution**, **marsupial.distribution**), processed *rase* objects (**goanna.rase**, **marsupial.rase**), and a joint geography object for use with *RPANDA* (**joint.geo.object**). 
@@ -745,7 +749,7 @@ We now have a *CoEvoGeoObject* that we can use for the geography-informed models
 ---
 
 ```{r, eval=T, echo=F}
-load("/Users/Ian/Google.Drive/R.Analyses/Varanus_Project/Varanus.Marsupial_Empirical_ModelObjects.RData")
+load("Varanus.Marsupial_Empirical_ModelObjects.RData")
 ```
 
 Combine the trait data for both phylogenies
