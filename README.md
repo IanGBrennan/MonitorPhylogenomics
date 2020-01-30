@@ -5,6 +5,7 @@ This repository holds associated files and scripts for our manuscript on the phy
 Otherwise, this repository includes the following (organized under folders of the same names):
 
  ## Trait_Evo
+ This folder is organized around the **Monitor Phylogenomics** walkthrough file (.Rmd) which includes code and explanation for plotting the phylogeny, manipulating data, and fitting models of trait evolution include coevolutionary models.
  + **All_Size_Data.csv**: data file holding size (SVL--snout-vent-length; Tail), group (marsupial or varanoid), habitat, and current status (extinct or extant) information for all taxa included in this study.
  + **CoEvo_Walkthrough.RDS**: R data file which contains all the phylogenetic, size, and distributional data for the coevolutionary analyses of monitor lizards and marsupials in the *Monitor Phylogenomics* walkthrough.
  + **Goanna_Ancestors.gif**: animated gif of the spread and speciation of monitor lizards across the Australian continent.
@@ -12,3 +13,12 @@ Otherwise, this repository includes the following (organized under folders of th
  + **GoannaMaps**: contemporary distribution maps of Australian monitors based on Atlas of Living Australia records. A subfolder holds the distribution maps of ancestral nodes.
  + **MonitorPhylogenomics** .html, .pdf, .Rmd: walkthrough files for the trait evolution of monitor lizards and marsupials. Exported as a webpage (html), pdf, and the base RMarkdown file.
  + **Varanus_Empirical_ModelObjects.RData** and **Varanus.Marsupial_Empirical_ModelObjects.RData**: if following along with the walkthrough, these files speed up the process by providing fitted model objects instead of requiring the user to run the entire model fitting exercises. 
+
+## Spatial_Evo
+This folder is organized around the **Spatial Functional Diversity** walkthrough file (.Rmd) which includes code and explanation for visualizing and analyzing spatial and functional diversity of Australian monitors and faunivorous marsupials.
++ **CoSpatial_Walkthrough.RDS**: R data file which contains all the phylogenetic and distributional data for the coevolutionary analyses of monitor lizards and marsupials in the *Spatial_Functional_Diversity* walkthrough.
+
+## Scripts_Files
+
+
+## Map_ShapeFiles
