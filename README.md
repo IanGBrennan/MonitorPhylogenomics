@@ -33,3 +33,4 @@ This folder holds a number of functions and scripts used to analyze the data and
 **search.surface.R**: is a relatively simple script to refit a model or models in parallel from different starting parameters to facilitate model fitting with complex models.
 
 ## Map_ShapeFiles
+These are just the shapefiles of Australia needed for the spatial evolution walkthrough. Don't worry about these too much.
