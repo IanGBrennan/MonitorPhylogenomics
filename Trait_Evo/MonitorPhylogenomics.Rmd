@@ -60,7 +60,7 @@ library(RColorBrewer)
 
 Now read in and have a quick look at our data.
 ```{r, eval=T, fig.height=10}
-gtree <- read.tree("~/Documents/GitHub/MonitorPhylogenomics/Varanidae_STRICT_HKY_270_con.newick");
+gtree <- read.nexus("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/Varanidae_Fossil.tre");
 plot.phylo(gtree)
 alldata <- read.csv("~/Documents/GitHub/MonitorPhylogenomics/Trait_Evo/All_Size_Data.csv", header=T)
 head(alldata)
@@ -133,29 +133,29 @@ library(rase)
 
 This is a collection of additional functions for RPANDA, and includes the new models we'll use later.  
 ```{r, message=F, warning=F}
-source("~/Documents/GitHub/MonitorPhylogenomics/RPANDA_extras.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/RPANDA_extras.R")
 ```
 These functions make a *Geo Object* from spatial data and your *rase* output.  
 ```{r, message=F, warning=F}
-source("~/Documents/GitHub/MonitorPhylogenomics/CreateGeoObject_fromSP.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/CreateGeoObject_fromSP.R")
 ```
 A collection of functions for extracting the AIC values and weights for a set of models.  
 ```{r, message=F, warning=F}
-source("~/Documents/GitHub/MonitorPhylogenomics/Calculate_AICs.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/Calculate_AICs.R")
 ```
 A function for plotting distribution maps for a set of taxa. This also translates spatial data into spatial geometries and OWin objects.  
 ```{r, message=F, warning=F}
-source("~/Documents/GitHub/MonitorPhylogenomics/plot.distmaps.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/plot.distmaps.R")
 ```
 This function processes a *rase* output object and makes distribution objects for ancestral nodes. More on that later...  
 ```{r, message=F, warning=F}
-source("~/Documents/GitHub/MonitorPhylogenomics/process.rase.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/process.rase.R")
 ```
 
 The likelihood optimization can be hard given the number of parameters we're estimating, so I've created a function 'search.surface' 
 that uses mclapply to fit the model a number of times with different starting parameters. It starts by creating sets of plausible starting parameters from across the surface, fits them and gives you the output either the best model fit, or all of the model fits. This function/method won't be necessary for simpler models like the BM or OU, and as implemented it won't work on models outside of the RPANDA framework.   
 ```{r, message=F, warning=F}
-source("~/Documents/GitHub/MonitorPhylogenomics/search.surface.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/search.surface.R")
 ```
 
 \pagebreak
@@ -403,7 +403,7 @@ Let's fit a model for goannas based on habitat partitioning (Collar et al. 2011)
 This is a multi-OU model with different "adaptive optima" per habitat/niche type.
 ```{r, eval=F, message=F, warning=F}
 library(OUwie)
-source("~/Documents/GitHub/MonitorPhylogenomics/make.OUwie.input_Script.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Scripts_Files/make.OUwie.input_Script.R")
 goanna.habitat <- make.OUwie.input(data=goanna$dat, 
                                    regime=goanna$dat$Habitat,
                                    taxa=goanna$phy$tip.label,

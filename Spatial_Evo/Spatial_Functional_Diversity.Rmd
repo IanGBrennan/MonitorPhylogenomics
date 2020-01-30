@@ -27,7 +27,7 @@ library(FD)
 We're going to turn our focus over to the Australian radiation of monitor lizards now, so we can load some existing files.  
 ```{r}
 #tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Trait_Evo/Goanna_Walkthrough.RDS")
-tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Spatial_Walkthrough.RDS")
+tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/Spatial_Walkthrough.RDS")
 names(tutorial)
 ```
 
@@ -351,7 +351,7 @@ diag(gc.dist.fd) <- 0
 
 We'll need to source the dispersal null metric function
 ```{r}
-source("~/Documents/GitHub/MonitorPhylogenomics/DispersalNullModel.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/DispersalNullModel.R")
 ```
 
 And create an additional function to run this null model repeatedly
@@ -444,8 +444,8 @@ RQ <- nullFD(n.model=NULL,
 
 If you don't have time to run those functions above, you'll want to read in the files
 ```{r}
-RQ <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData.RDS")
-SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData_SES_raster.RDS")
+RQ <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedGoanna_RaoQ_logData.RDS")
+SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedGoanna_RaoQ_logData_SES_raster.RDS")
 ```
 
 Now we need to add the empirical FD (or richness) values to this data frame
@@ -491,8 +491,8 @@ plot(SESras)
 
 If you've been running all these steps, you'll want to save the output
 ```{r, eval=F}
-saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData.RDS")
-saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedGoanna_RaoQ_logData_SES_raster.RDS")
+saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedGoanna_RaoQ_logData.RDS")
+saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedGoanna_RaoQ_logData_SES_raster.RDS")
 ```
 
 Have a quick look at some of the parameters
@@ -593,7 +593,7 @@ ggplot(CIses, aes(x=richness, y=mean)) +
 We can do run the same analyses to see what the patterns of richness and functional diversity are for dasyuromorph and peramelamorph marsupials.
 
 ```{r}
-marsupial.tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Marsupial_Walkthrough.RDS")
+marsupial.tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/Marsupial_Walkthrough.RDS")
 names(marsupial.tutorial)
 ```
 
@@ -871,7 +871,7 @@ diag(gc.dist.fd) <- 0
 
 We'll need to source the dispersal null metric function
 ```{r}
-source("~/Documents/GitHub/MonitorPhylogenomics/DispersalNullModel.R")
+source("~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/DispersalNullModel.R")
 ```
 
 And create an additional function to run this null model repeatedly
@@ -964,8 +964,8 @@ RQ <- nullFD(n.model=NULL,
 
 If you don't have time to run those functions above, you'll want to read in the files
 ```{r}
-RQ <-     readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData.RDS")
-SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData_SES_raster.RDS")
+RQ <-     readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedMarsupial_RaoQ_logData.RDS")
+SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedMarsupial_RaoQ_logData_SES_raster.RDS")
 ```
 
 Now we need to add the empirical FD (or richness) values to this data frame
@@ -1011,8 +1011,8 @@ plot(SESras)
 
 If you've been running all these steps, you'll want to save the output
 ```{r, eval=F}
-saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData.RDS")
-saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedMarsupial_RaoQ_logData_SES_raster.RDS")
+saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedMarsupial_RaoQ_logData.RDS")
+saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedMarsupial_RaoQ_logData_SES_raster.RDS")
 ```
 
 Have a quick look at some of the parameters
@@ -1116,7 +1116,7 @@ ggplot(CIses, aes(x=richness, y=mean)) +
 Great, now we want to do the same spatial analyses for both the monitor lizards and the cohabiting marsupials.
 
 ```{r}
-cospatial.tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/CoSpatial_Walkthrough.RDS")
+cospatial.tutorial <- readRDS("~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/CoSpatial_Walkthrough.RDS")
 names(cospatial.tutorial)
 ```
 
@@ -1503,8 +1503,8 @@ RQ <- nullFD(n.model=NULL,
 
 If you don't have time to run the above functions, you'll want to read in the files
 ```{r}
-RQ <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData.RDS")
-SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData_SES_raster.RDS")
+RQ <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedBoth_RaoQ_logData.RDS")
+SESras <- readRDS(file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedBoth_RaoQ_logData_SES_raster.RDS")
 ```
 
 Now we need to add the empirical FD (or richness) values to this data frame
@@ -1550,8 +1550,8 @@ plot(SESras)
 
 If you've been running all these steps from scratch, you'll want to save the output
 ```{r, eval=F}
-saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData.RDS")
-saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/SimulatedBoth_RaoQ_logData_SES_raster.RDS")
+saveRDS(RQ, file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedBoth_RaoQ_logData.RDS")
+saveRDS(SESras, file="~/Documents/GitHub/MonitorPhylogenomics/Spatial_Evo/SimulatedBoth_RaoQ_logData_SES_raster.RDS")
 ```
 
 Have a quick look at some of the parameters
