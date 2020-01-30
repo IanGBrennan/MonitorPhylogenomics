@@ -5,4 +5,4 @@ This repository holds associated files and scripts for our manuscript on the phy
 Otherwise, this repository includes the following (organized under folders of the same names):
 
  ## Trait_Evo
- 		+ All_Size_Data.csv: 
+ + **All_Size_Data.csv**: data file holding size (SVL--snout-vent-length; Tail), group (marsupial or varanoid), habitat, and current status (extinct or extant) information for all taxa included in this study. 
