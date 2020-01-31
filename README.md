@@ -30,7 +30,8 @@ This folder holds a number of functions and scripts used to analyze the data and
 + **plot.distmaps.R**: this function takes in spatial data as lat/lon and plots the distributions, while translating the data into spatial geometries.
 + **process.rase**: follows running *rase* and processes the output into a similar format as the empirical data, resulting in a similar output to *plot.distmaps*
 + **RPANDA_extras.R**: includes the additional evolutionary models described in the text. It also includes a number of RPANDA functions not included in the current CRAN version which are required to fit the models.
-**search.surface.R**: is a relatively simple script to refit a model or models in parallel from different starting parameters to facilitate model fitting with complex models.
++ **search.surface.R**: 
+ + is a relatively simple script to refit a model or models in parallel from different starting parameters to facilitate model fitting with complex models.
 
 ## Map_ShapeFiles
 These are just the shapefiles of Australia needed for the spatial evolution walkthrough. Don't worry about these too much.
