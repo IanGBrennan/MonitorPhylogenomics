@@ -4,6 +4,8 @@ This repository holds associated files and scripts for our manuscript on the phy
 
 Otherwise, this repository includes the following (organized under folders of the same names):
 
+---
+
  ## Trait_Evo
  This folder is organized around the **Monitor Phylogenomics** walkthrough file (.Rmd) which includes code and explanation for plotting the phylogeny, manipulating data, and fitting models of trait evolution include coevolutionary models.
  + **All_Size_Data.csv**: data file holding size (SVL--snout-vent-length; Tail), group (marsupial or varanoid), habitat, and current status (extinct or extant) information for all taxa included in this study.
@@ -13,6 +15,8 @@ Otherwise, this repository includes the following (organized under folders of th
  + **GoannaMaps**: contemporary distribution maps of Australian monitors based on Atlas of Living Australia records. A subfolder holds the distribution maps of ancestral nodes.
  + **MonitorPhylogenomics** .html, .pdf, .Rmd: walkthrough files for the trait evolution of monitor lizards and marsupials. Exported as a webpage (html), pdf, and the base RMarkdown file.
  + **Varanus_Empirical_ModelObjects.RData** and **Varanus.Marsupial_Empirical_ModelObjects.RData**: if following along with the walkthrough, these files speed up the process by providing fitted model objects instead of requiring the user to run the entire model fitting exercises. 
+ 
+---
 
 ## Spatial_Evo
 This folder is organized around the **Spatial Functional Diversity** walkthrough file (.Rmd) which includes code and explanation for visualizing and analyzing spatial and functional diversity of Australian monitors and faunivorous marsupials.
@@ -20,6 +24,8 @@ This folder is organized around the **Spatial Functional Diversity** walkthrough
 + **DispersalNullModel.R**: the code for the dispersal null model used to sample functional diversity across grid cells.
 +  **SimulatedGoanna...**, **SimulatedMarsupial...**, and **SimulatedBoth...RDS**: R data files containing functional diversity data simulated using the *Dispersal Null Model* for each of the montitors, marsupials, and both together.
 + **Spatial_Functional_Diversity** .pdf, .Rmd: walkthrough files for the spatial evolution and functional diversity analyses. 
+
+---
 
 ## Scripts_Files
 This folder holds a number of functions and scripts used to analyze the data and that are sourced in the walkthrough files listed above.
@@ -30,8 +36,9 @@ This folder holds a number of functions and scripts used to analyze the data and
 + **plot.distmaps.R**: this function takes in spatial data as lat/lon and plots the distributions, while translating the data into spatial geometries.
 + **process.rase**: follows running *rase* and processes the output into a similar format as the empirical data, resulting in a similar output to *plot.distmaps*
 + **RPANDA_extras.R**: includes the additional evolutionary models described in the text. It also includes a number of RPANDA functions not included in the current CRAN version which are required to fit the models.
-+ **search.surface.R**: 
- - is a relatively simple script to refit a model or models in parallel from different starting parameters to facilitate model fitting with complex models.
++ **search.surface.R**: is a relatively simple script to refit a model or models in parallel from different starting parameters to facilitate model fitting with complex models.
+
+---
 
 ## Map_ShapeFiles
 These are just the shapefiles of Australia needed for the spatial evolution walkthrough. Don't worry about these too much.
